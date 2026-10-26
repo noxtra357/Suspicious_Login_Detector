@@ -1,4 +1,3 @@
-"""Детектор подозрительных входов"""
 from __future__ import annotations
 
 import argparse
@@ -13,9 +12,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-# ---------------------------------------------------------------------------
-# Справочники
-# ---------------------------------------------------------------------------
 
 SEVERITY = {
     "high": {"label": "Высокий", "points": 40, "rank": 3},
@@ -58,7 +54,7 @@ RULES = {
     },
 }
 
-# код: (название по-русски, название по-английски, широта, долгота центра страны)
+
 COUNTRIES = {
     "NL": ("Нидерланды", "Netherlands", 52.2, 5.5),
     "DE": ("Германия", "Germany", 51.2, 10.4),
@@ -105,7 +101,7 @@ for _code, _v in COUNTRIES.items():
     COUNTRY_BY_NAME[_v[0].lower()] = _code
     COUNTRY_BY_NAME[_v[1].lower()] = _code
 
-# Названия столбцов, которые понимает парсер (в нормализованном виде).
+
 SYNONYMS = {
     "time": ["time", "timestamp", "date", "datetime", "время", "дата", "датаивремя"],
     "user": ["user", "username", "login", "account", "email", "пользователь", "логин", "учетнаязапись"],
@@ -123,29 +119,24 @@ FAIL_WORDS = {
 }
 
 
-# ---------------------------------------------------------------------------
-# Модели данных
-# ---------------------------------------------------------------------------
 
 @dataclass
 class LoginEvent:
-    t: float        # время в секундах (Unix)
-    hour: int       # час так, как он записан в журнале
-    ts: str         # время строкой из журнала
+    t: float        
+    hour: int       
+    ts: str         
     user: str
     ip: str
     country: str
     device: str
-    ok: bool        # True: успешный вход, False: неудачный
-
+    ok: bool       
 
 @dataclass
 class Config:
-    fails: int = 5               # неудач для «перебора пароля»
-    window_min: int = 10         # окно серии, минут
-    spray: int = 4               # логинов с одного IP для «распыления паролей»
-    speed_kmh: float = 900.0     # предельная скорость перемещения
-
+    fails: int = 5               
+    window_min: int = 10        
+    spray: int = 4               
+    speed_kmh: float = 900.0     
 
 @dataclass
 class Finding:
@@ -153,7 +144,7 @@ class Finding:
     severity: str
     t: float
     ts: str
-    subject: str                 # логин или «IP x.x.x.x»
+    subject: str               
     user: Optional[str]
     ip: str
     country: str
@@ -182,9 +173,6 @@ class Report:
     clean: List[str]
 
 
-# ---------------------------------------------------------------------------
-# Вспомогательные функции
-# ---------------------------------------------------------------------------
 
 def plural(n: int, forms: Tuple[str, str, str]) -> str:
     """plural(3, ('вход', 'входа', 'входов')) -> 'входа'"""
@@ -284,9 +272,6 @@ def _norm_header(s: str) -> str:
     return re.sub(r"[\s_\-]+", "", s.lower().replace("ё", "е"))
 
 
-# ---------------------------------------------------------------------------
-# Чтение журнала
-# ---------------------------------------------------------------------------
 
 def parse_log(text: str) -> Tuple[List[LoginEvent], int]:
     """Разбирает CSV. Возвращает (события по времени, число пропущенных строк).
@@ -342,9 +327,6 @@ def parse_log(text: str) -> Tuple[List[LoginEvent], int]:
     return events, skipped
 
 
-# ---------------------------------------------------------------------------
-# Анализ
-# ---------------------------------------------------------------------------
 
 def analyze(events: List[LoginEvent], cfg: Optional[Config] = None, skipped: int = 0) -> Report:
     cfg = cfg or Config()
@@ -371,7 +353,7 @@ def analyze(events: List[LoginEvent], cfg: Optional[Config] = None, skipped: int
         fails = [e for e in items if not e.ok]
         succ = [e for e in items if e.ok]
 
-        # Перебор пароля: много неудач за короткое окно
+        
         i = 0
         while i < len(fails):
             j = i
@@ -393,7 +375,7 @@ def analyze(events: List[LoginEvent], cfg: Optional[Config] = None, skipped: int
             else:
                 i += 1
 
-        # Успешный вход вскоре после серии неудач
+       
         for e in succ:
             recent = [f for f in fails if f.t <= e.t and e.t - f.t <= 15 * 60]
             if len(recent) >= 3:
@@ -406,7 +388,7 @@ def analyze(events: List[LoginEvent], cfg: Optional[Config] = None, skipped: int
                 )
                 add("afterfail", "high", e, text)
 
-        # Новая страна и новое устройство (нужно хотя бы три успешных входа в прошлом)
+       
         seen_countries: Dict[str, None] = {}
         seen_devices = set()
         for prior, e in enumerate(succ):
@@ -423,7 +405,7 @@ def analyze(events: List[LoginEvent], cfg: Optional[Config] = None, skipped: int
             if e.device:
                 seen_devices.add(e.device.lower())
 
-        # Невозможное перемещение между соседними успешными входами
+        
         for a, b in zip(succ, succ[1:]):
             if not a.country or not b.country or a.country == b.country:
                 continue
@@ -442,12 +424,12 @@ def analyze(events: List[LoginEvent], cfg: Optional[Config] = None, skipped: int
                     f"Вход из {country_label(a.country)}, через {fmt_duration(dt)} вход из {country_label(b.country)}. "
                     "Расстояние оценить нельзя: одна из стран не распознана.")
 
-        # Ночные входы
+       
         for e in succ:
             if e.hour < 5:
                 add("night", "low", e, f"Успешный вход около {e.hour:02d}:00 по времени журнала.")
 
-        # Много адресов за час
+        
         i = 0
         while i < len(succ):
             j = i
@@ -464,7 +446,7 @@ def analyze(events: List[LoginEvent], cfg: Optional[Config] = None, skipped: int
             else:
                 i += 1
 
-    # Распыление паролей: один IP, много разных логинов
+    
     for ip, items in fails_by_ip.items():
         i = 0
         while i < len(items):
@@ -486,8 +468,7 @@ def analyze(events: List[LoginEvent], cfg: Optional[Config] = None, skipped: int
 
     findings.sort(key=lambda f: (-SEVERITY[f.severity]["rank"], -f.t))
 
-    # Риск по учётным записям: первое срабатывание правила даёт полные баллы,
-    # повторы того же правила половину. Максимум 100.
+    
     scores: List[UserScore] = []
     for user in by_user:
         mine = sorted((f for f in findings if f.user == user), key=lambda f: f.t)
@@ -509,9 +490,6 @@ def analyze(events: List[LoginEvent], cfg: Optional[Config] = None, skipped: int
                   findings=findings, scores=scores, clean=clean)
 
 
-# ---------------------------------------------------------------------------
-# Вывод
-# ---------------------------------------------------------------------------
 
 def render_text(report: Report, color: bool = False, min_level: str = "low") -> str:
     def paint(s: str, code: str) -> str:
@@ -567,9 +545,6 @@ def report_to_dict(report: Report) -> dict:
     }
 
 
-# ---------------------------------------------------------------------------
-# Консольный запуск
-# ---------------------------------------------------------------------------
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Детектор подозрительных входов: анализ журнала входов в CSV.")
@@ -589,7 +564,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Optional[List[str]] = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
+        sys.stdout.reconfigure(encoding="utf-8")  
     except (AttributeError, ValueError):
         pass
 
