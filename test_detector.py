@@ -1,4 +1,3 @@
-"""Тесты детектора"""
 import unittest
 from pathlib import Path
 
@@ -29,7 +28,7 @@ class SampleLogTests(unittest.TestCase):
         self.assertIn("travel", self.rules_for("a.ivanova"))
 
     def test_slow_trip_is_not_impossible(self):
-        # Германия -> Вьетнам за 17 часов укладывается в порог скорости.
+       
         self.assertNotIn("travel", self.rules_for("m.petrov"))
 
     def test_password_spraying_attributed_to_ip(self):
